@@ -1,0 +1,20 @@
+# Secrets - NEVER commit these
+.env
+.env.*
+*.pem
+*.key
+id_rsa*
+*.secret
+credentials*
+
+# Plugin data (managed by lazy.nvim at runtime)
+nvim/plugin/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+*.swp
+*.swo
+*~
