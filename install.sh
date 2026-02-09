@@ -54,6 +54,10 @@ mkdir -p "$(dirname "$NVIM_CONFIG")"
 ln -sf "$DOTFILES_DIR/nvim" "$NVIM_CONFIG"
 echo "Linked $DOTFILES_DIR/nvim -> $NVIM_CONFIG"
 
+# Enable pre-commit hook for secret detection
+git -C "$DOTFILES_DIR" config core.hooksPath hooks
+echo "Pre-commit secret detection hook enabled"
+
 # Bootstrap plugins (headless)
 echo "Installing plugins..."
 nvim --headless "+Lazy! sync" +qa 2>/dev/null || true

@@ -1,0 +1,60 @@
+#!/bin/sh
+# Pre-commit hook: block secrets from being committed
+
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+BLOCKED_FILES='\.env$|\.env\.|\.pem$|\.key$|\.p12$|\.pfx$|\.jks$|id_rsa|id_ed25519|id_ecdsa|\.secret$|credentials\.json|service.account\.json|token\.json'
+
+SECRET_PATTERNS='PRIVATE KEY|password\s*=\s*["\x27].+["\x27]|passwd\s*=\s*["\x27].+["\x27]|secret\s*=\s*["\x27].+["\x27]|api[_-]?key\s*=\s*["\x27].+["\x27]|api[_-]?token\s*=\s*["\x27].+["\x27]|access[_-]?key\s*=\s*["\x27].+["\x27]|auth[_-]?token\s*=\s*["\x27].+["\x27]|AKIA[0-9A-Z]{16}|ghp_[a-zA-Z0-9]{36}|gho_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9_]{22,}|sk-[a-zA-Z0-9]{20,}|xox[bpoas]-[a-zA-Z0-9-]+|glpat-[a-zA-Z0-9_-]{20,}'
+
+FOUND=0
+
+# Check staged file names against blocked patterns
+STAGED=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null)
+
+if [ -z "$STAGED" ]; then
+    exit 0
+fi
+
+for file in $STAGED; do
+    if echo "$file" | grep -qiE "$BLOCKED_FILES"; then
+        printf "${RED}BLOCKED${NC} Sensitive file: %s\n" "$file"
+        FOUND=1
+    fi
+done
+
+# Check staged file contents for secret patterns
+SKIP_CONTENT='hooks/pre-commit'
+
+for file in $STAGED; do
+    # Skip binary files and the hook itself
+    if file "$file" 2>/dev/null | grep -q "binary"; then
+        continue
+    fi
+    if echo "$file" | grep -qF "$SKIP_CONTENT"; then
+        continue
+    fi
+
+    MATCHES=$(git diff --cached --diff-filter=ACM -p -- "$file" \
+        | grep '^+' | grep -v '^+++' \
+        | grep -inE "$SECRET_PATTERNS" 2>/dev/null || true)
+
+    if [ -n "$MATCHES" ]; then
+        printf "${RED}BLOCKED${NC} Secret pattern in %s:\n" "$file"
+        echo "$MATCHES" | while IFS= read -r line; do
+            printf "  ${YELLOW}%s${NC}\n" "$line"
+        done
+        FOUND=1
+    fi
+done
+
+if [ "$FOUND" -eq 1 ]; then
+    echo ""
+    printf "${RED}Commit blocked.${NC} Secrets detected in staged changes.\n"
+    echo "If this is a false positive, commit with: git commit --no-verify"
+    exit 1
+fi
+
+exit 0
