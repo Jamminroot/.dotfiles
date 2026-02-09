@@ -20,21 +20,18 @@ return {
                 "bashls",
             },
             automatic_installation = true,
-            automatic_enable = false,
         },
     },
 
-    -- LSP config
+    -- LSP server definitions (registers configs for vim.lsp.config)
     {
         "neovim/nvim-lspconfig",
-        event = { "BufReadPre", "BufNewFile" },
         dependencies = {
             "williamboman/mason.nvim",
             "williamboman/mason-lspconfig.nvim",
             "hrsh7th/cmp-nvim-lsp",
         },
         config = function()
-            local lspconfig = require("lspconfig")
             local capabilities = require("cmp_nvim_lsp").default_capabilities()
 
             -- Keymaps on LSP attach
@@ -71,7 +68,7 @@ return {
                 float = { border = "rounded", source = true },
             })
 
-            -- Server configs
+            -- Server configs via vim.lsp.config (Neovim 0.11+)
             local servers = {
                 lua_ls = {
                     settings = {
@@ -93,8 +90,10 @@ return {
 
             for server, config in pairs(servers) do
                 config.capabilities = capabilities
-                lspconfig[server].setup(config)
+                vim.lsp.config(server, config)
             end
+
+            vim.lsp.enable(vim.tbl_keys(servers))
         end,
     },
 }
