@@ -46,6 +46,17 @@ opt.timeoutlen = 500
 opt.hidden = true
 opt.mouse = "a"
 opt.clipboard = "unnamedplus"
+vim.g.clipboard = {
+    name = "OSC 52",
+    copy = {
+        ["+"] = require("vim.ui.clipboard.osc52").copy("+"),
+        ["*"] = require("vim.ui.clipboard.osc52").copy("*"),
+    },
+    paste = {
+        ["+"] = require("vim.ui.clipboard.osc52").paste("+"),
+        ["*"] = require("vim.ui.clipboard.osc52").paste("*"),
+    },
+}
 opt.completeopt = { "menu", "menuone", "noselect" }
 opt.wildmode = "longest:full,full"
 opt.iskeyword:append("-")
