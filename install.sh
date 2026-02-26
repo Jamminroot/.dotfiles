@@ -3,29 +3,60 @@ set -e
 
 echo "=== Dotfiles installer ==="
 
-# Install neovim if not present
-if ! command -v nvim &>/dev/null; then
-    echo "Installing Neovim..."
-    if command -v apt-get &>/dev/null; then
-        sudo apt-get update && sudo apt-get install -y neovim
-    elif command -v dnf &>/dev/null; then
-        sudo dnf install -y neovim
-    elif command -v pacman &>/dev/null; then
-        sudo pacman -S --noconfirm neovim
-    elif command -v brew &>/dev/null; then
-        brew install neovim
-    else
-        echo "No package manager found, installing from prebuilt binary..."
-        curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.tar.gz
-        mkdir -p ~/.local
-        tar xzf nvim-linux-x86_64.tar.gz -C ~/.local --strip-components=1
-        rm nvim-linux-x86_64.tar.gz
-        export PATH="$HOME/.local/bin:$PATH"
-        grep -q '.local/bin' ~/.bashrc 2>/dev/null || echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+NVIM_MIN_VERSION="0.11"
+
+nvim_version_ok() {
+    if ! command -v nvim &>/dev/null; then
+        return 1
     fi
-    echo "Neovim installed: $(nvim --version | head -1)"
+    local ver
+    ver=$(nvim --version | head -1 | grep -oP '\d+\.\d+')
+    printf '%s\n%s' "$NVIM_MIN_VERSION" "$ver" | sort -V -C
+}
+
+install_nvim_binary() {
+    local arch os url
+    arch=$(uname -m)
+    os=$(uname -s)
+    if [ "$os" = "Darwin" ]; then
+        url="https://github.com/neovim/neovim/releases/latest/download/nvim-macos-${arch}.tar.gz"
+    elif [ "$os" = "Linux" ]; then
+        case "$arch" in
+            x86_64)  url="https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.tar.gz" ;;
+            aarch64) url="https://github.com/neovim/neovim/releases/latest/download/nvim-linux-aarch64.tar.gz" ;;
+            *)       echo "Unsupported architecture: $arch"; return 1 ;;
+        esac
+    else
+        echo "Unsupported OS: $os"; return 1
+    fi
+    local tmpdir
+    tmpdir=$(mktemp -d)
+    curl -fsSL "$url" -o "$tmpdir/nvim.tar.gz"
+    mkdir -p "$HOME/.local"
+    tar xzf "$tmpdir/nvim.tar.gz" -C "$HOME/.local" --strip-components=1
+    rm -rf "$tmpdir"
+    case ":$PATH:" in
+        *":$HOME/.local/bin:"*) ;;
+        *)
+            export PATH="$HOME/.local/bin:$PATH"
+            for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
+                [ -f "$rc" ] && grep -q '.local/bin' "$rc" 2>/dev/null || echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$rc"
+            done
+            ;;
+    esac
+}
+
+if nvim_version_ok; then
+    echo "Neovim already installed and >= $NVIM_MIN_VERSION: $(nvim --version | head -1)"
 else
-    echo "Neovim already installed: $(nvim --version | head -1)"
+    echo "Installing Neovim >= $NVIM_MIN_VERSION from GitHub release..."
+    install_nvim_binary
+    if nvim_version_ok; then
+        echo "Neovim installed: $(nvim --version | head -1)"
+    else
+        echo "ERROR: Failed to install Neovim >= $NVIM_MIN_VERSION"
+        exit 1
+    fi
 fi
 
 # Install dependencies
